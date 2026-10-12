@@ -19,8 +19,10 @@ The app loads `academics_handbook.pdf` and `fee_structure.pdf` at startup. Keep 
 
 Create a **Python Web Service** with the project root as its root directory:
 
-- Build command: `pip install -r requirements.txt`
+- Build command: `pip install -r requirements-render.txt`
 - Start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
 - Environment variable: `GROQ_API_KEY` (store the value in Render's environment settings)
 
-The first startup may take longer because the embedding model is downloaded and the PDF indexes are built.
+This installs only the web app's runtime dependencies and avoids downloading the local transformer model and FAISS.
+
+The app builds lightweight BM25 text indexes from `academics_handbook.pdf` and `fee_structure.pdf` at startup. Keep both PDFs and the `images/` directory in the project root.
