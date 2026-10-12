@@ -14,9 +14,8 @@ from langgraph.graph import StateGraph, START, END
 from langchain_groq import ChatGroq
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
+from bm25 import BM25Retriever
  
 mimetypes.add_type("image/avif", ".avif")
 
@@ -32,26 +31,24 @@ load_dotenv()
 # Step 1 - Building the RAG retrievers (runs once at server start)
 # ----------------------------
 def load_resources():
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
- 
-    def build_retriver(pdf_path: str):
+    def build_retriever(pdf_filename: str):
+        pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), pdf_filename)
         loader = PyPDFLoader(pdf_path)
         document = loader.load()
  
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.split_documents(document)
-        vectorstore = FAISS.from_documents(chunks, embeddings)
-        return vectorstore.as_retriever(search_kwargs={"k": 8})
+        return BM25Retriever(chunks, k=8)
  
-    acedemic_retriever = build_retriver("academics_handbook.pdf")
-    fee_retriever = build_retriver("fee_structure.pdf")
+    academic_retriever = build_retriever("academics_handbook.pdf")
+    fee_retriever = build_retriever("fee_structure.pdf")
  
     llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0.3)
  
-    return acedemic_retriever, fee_retriever, llm
+    return academic_retriever, fee_retriever, llm
  
  
-acedemic_retriever, fee_retriever, llm = load_resources()
+academic_retriever, fee_retriever, llm = load_resources()
  
  
 # ----------------------------
@@ -403,7 +400,7 @@ def retrieve_node(state: State) -> dict:
         query = human[-2] + " " + query
 
     seen, parts = set(), []
-    for name, retriever in (("Academic Handbook", acedemic_retriever), ("Fee Structure", fee_retriever)):
+    for name, retriever in (("Academic Handbook", academic_retriever), ("Fee Structure", fee_retriever)):
         for doc in retriever.invoke(query):
             text = doc.page_content.strip()
             if text in seen:
